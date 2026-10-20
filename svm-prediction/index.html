@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="eu">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SVM prediction interaktiboa</title>
+<style>
+  :root{
+    --navy:#0b3a6f;
+    --blue:#1976d2;
+    --blue-soft:#e9f4ff;
+    --red:#e53935;
+    --red-soft:#fff0f0;
+    --green:#16824a;
+    --green-soft:#eaf8ef;
+    --purple:#7b1fa2;
+    --purple-soft:#f5eafa;
+    --gold:#d99a00;
+    --gold-soft:#fff6d7;
+    --ink:#132238;
+    --muted:#66758a;
+    --line:#cfd9e6;
+    --panel:#ffffff;
+    --bg:#f4f8fc;
+  }
+
+  *{box-sizing:border-box}
+
+  html,body{
+    margin:0;
+    min-height:100%;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  body{
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    padding:20px;
+  }
+
+  .slide{
+    width:min(1600px, 100%);
+    aspect-ratio:16/9;
+    min-height:760px;
+    background:white;
+    border-radius:22px;
+    overflow:hidden;
+    box-shadow:0 10px 36px rgba(24,52,86,.12);
+    display:grid;
+    grid-template-rows:auto 1fr auto;
+  }
+
+  .header{
+    background:linear-gradient(90deg,#0b4c88,#0b3a6f);
+    color:white;
+    padding:24px 34px 20px;
+  }
+
+  .header h1{
+    margin:0;
+    font-size:clamp(30px,3vw,50px);
+    line-height:1.05;
+    letter-spacing:-.02em;
+  }
+
+  .header p{
+    margin:8px 0 0;
+    font-size:clamp(16px,1.4vw,24px);
+    opacity:.92;
+  }
+
+  .main{
+    display:grid;
+    grid-template-columns:1.35fr .65fr;
+    gap:22px;
+    padding:26px 30px 20px;
+    min-height:0;
+  }
+
+  .viz,
+  .explain{
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:var(--panel);
+  }
+
+  .viz{
+    padding:24px;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+  }
+
+  .axis-wrap{
+    position:relative;
+    margin:6px 6px 12px;
+    height:330px;
+    border-radius:16px;
+    overflow:hidden;
+    background:
+      linear-gradient(90deg,
+        rgba(229,57,53,.08) 0%,
+        rgba(229,57,53,.08) 50%,
+        rgba(25,118,210,.08) 50%,
+        rgba(25,118,210,.08) 100%);
+  }
+
+  .margin-zone{
+    position:absolute;
+    left:25%;
+    right:25%;
+    top:0;
+    bottom:0;
+    background:rgba(123,31,162,.055);
+    border-left:2px dashed rgba(19,34,56,.5);
+    border-right:2px dashed rgba(19,34,56,.5);
+  }
+
+  .boundary{
+    position:absolute;
+    left:50%;
+    top:0;
+    bottom:0;
+    width:4px;
+    background:var(--ink);
+    transform:translateX(-50%);
+  }
+
+  .axis{
+    position:absolute;
+    left:6%;
+    right:6%;
+    top:55%;
+    height:4px;
+    background:var(--ink);
+    border-radius:4px;
+  }
+
+  .axis:before,
+  .axis:after{
+    content:"";
+    position:absolute;
+    top:50%;
+    width:0;height:0;
+    border-top:9px solid transparent;
+    border-bottom:9px solid transparent;
+    transform:translateY(-50%);
+  }
+  .axis:before{left:-1px;border-right:14px solid var(--ink)}
+  .axis:after{right:-1px;border-left:14px solid var(--ink)}
+
+  .tick{
+    position:absolute;
+    top:61%;
+    transform:translateX(-50%);
+    text-align:center;
+    font-weight:700;
+    font-size:18px;
+  }
+  .tick small{
+    display:block;
+    margin-top:4px;
+    color:var(--muted);
+    font-size:14px;
+    font-weight:600;
+  }
+  .tneg1{left:25%}
+  .tzero{left:50%}
+  .tpos1{left:75%}
+
+  .class-label{
+    position:absolute;
+    top:12%;
+    font-size:clamp(18px,1.5vw,25px);
+    font-weight:800;
+  }
+  .class0{left:8%;color:var(--red)}
+  .class1{right:8%;color:var(--blue)}
+
+  .point{
+    position:absolute;
+    top:55%;
+    left:57.5%;
+    width:34px;
+    height:34px;
+    border-radius:50%;
+    transform:translate(-50%,-50%);
+    background:var(--blue);
+    border:4px solid white;
+    box-shadow:0 0 0 3px var(--ink), 0 8px 22px rgba(0,0,0,.18);
+    transition:left .08s linear, background .12s ease;
+    z-index:5;
+  }
+
+  .score-badge{
+    position:absolute;
+    top:30%;
+    left:57.5%;
+    transform:translateX(-50%);
+    background:white;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:8px 12px;
+    font-size:18px;
+    font-weight:800;
+    box-shadow:0 5px 16px rgba(20,40,70,.08);
+    transition:left .08s linear;
+    white-space:nowrap;
+    z-index:6;
+  }
+
+  .zone-label{
+    position:absolute;
+    bottom:10%;
+    left:50%;
+    transform:translateX(-50%);
+    padding:8px 14px;
+    border-radius:999px;
+    background:var(--purple-soft);
+    color:var(--purple);
+    font-weight:800;
+    font-size:15px;
+  }
+
+  .controls{
+    padding:8px 6px 0;
+  }
+
+  .controls-row{
+    display:flex;
+    align-items:center;
+    gap:16px;
+  }
+
+  input[type="range"]{
+    width:100%;
+    accent-color:var(--navy);
+  }
+
+  .score-output{
+    min-width:112px;
+    font-size:22px;
+    font-weight:900;
+    text-align:right;
+  }
+
+  .legend{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:10px;
+    margin-top:15px;
+  }
+
+  .legend div{
+    border-radius:12px;
+    padding:10px 8px;
+    text-align:center;
+    font-size:13px;
+    font-weight:700;
+    border:1px solid var(--line);
+    background:#fafcff;
+  }
+
+  .explain{
+    padding:22px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+
+  .result{
+    border-radius:16px;
+    padding:20px;
+    border:2px solid var(--line);
+    background:#fafcff;
+  }
+
+  .result .kicker{
+    font-size:13px;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--muted);
+  }
+
+  .prediction{
+    margin-top:6px;
+    font-size:clamp(28px,2.4vw,42px);
+    font-weight:900;
+    line-height:1;
+  }
+
+  .location{
+    margin-top:8px;
+    font-size:18px;
+    font-weight:700;
+  }
+
+  .why{
+    font-size:16px;
+    color:var(--muted);
+    margin-top:8px;
+    line-height:1.45;
+  }
+
+  .rule{
+    border-radius:14px;
+    padding:16px 18px;
+    background:var(--blue-soft);
+    border:1px solid #cfe5fb;
+  }
+
+  .rule h3{
+    margin:0 0 8px;
+    color:var(--navy);
+    font-size:20px;
+  }
+
+  .rule p{
+    margin:0;
+    line-height:1.45;
+    font-size:16px;
+  }
+
+  .cases{
+    display:grid;
+    gap:8px;
+  }
+
+  .case{
+    display:grid;
+    grid-template-columns:105px 1fr;
+    gap:12px;
+    align-items:center;
+    border-radius:12px;
+    padding:10px 12px;
+    border:1px solid var(--line);
+  }
+
+  .case code{
+    font-size:15px;
+    font-weight:800;
+  }
+
+  .case span{
+    font-size:14px;
+    color:var(--muted);
+  }
+
+  .footer{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:12px;
+    padding:0 30px 24px;
+  }
+
+  .footer-card{
+    border-radius:14px;
+    padding:14px 16px;
+    border:1px solid var(--line);
+    background:#fafcff;
+    font-size:14px;
+    line-height:1.35;
+  }
+
+  .footer-card strong{
+    display:block;
+    margin-bottom:4px;
+    color:var(--navy);
+  }
+
+  .hotkeys{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:8px;
+  }
+
+  @media (max-width:1000px){
+    body{padding:0}
+    .slide{aspect-ratio:auto;min-height:0;border-radius:0}
+    .main{grid-template-columns:1fr}
+    .axis-wrap{height:300px}
+    .footer{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+  <main class="slide">
+    <header class="header">
+      <h1>SVM prediction interaktiboa</h1>
+      <p>Marjinaren barruan egon arren, puntu berriak klase bat jasotzen du.</p>
+    </header>
+
+    <section class="main">
+      <div class="viz">
+        <div class="axis-wrap" id="axisWrap" aria-label="SVM decision score visualization">
+          <div class="margin-zone"></div>
+          <div class="boundary"></div>
+          <div class="axis"></div>
+
+          <div class="class-label class0">Klase 0 aldean</div>
+          <div class="class-label class1">Klase 1 aldean</div>
+
+          <div class="tick tneg1">−1<small>marjina</small></div>
+          <div class="tick tzero">0<small>decision boundary</small></div>
+          <div class="tick tpos1">+1<small>marjina</small></div>
+
+          <div class="score-badge" id="badge">score = +0.30</div>
+          <div class="point" id="point"></div>
+
+          <div class="zone-label">MARJINAREN BARRUALDEA</div>
+        </div>
+
+        <div class="controls">
+          <div class="controls-row">
+            <input id="slider" type="range" min="-2" max="2" step="0.01" value="0.30"
+                   aria-label="Decision score" />
+            <div class="score-output" id="scoreOutput">+0.30</div>
+          </div>
+
+          <div class="legend">
+            <div>score &lt; −1<br>Klase 0</div>
+            <div>−1 &lt; score &lt; 0<br>Klase 0</div>
+            <div>score = 0<br>Muga</div>
+            <div>0 &lt; score &lt; +1<br>Klase 1</div>
+            <div>score &gt; +1<br>Klase 1</div>
+          </div>
+
+          <div class="hotkeys">← → gezi-teklak ere erabil ditzakezu puntu berria mugitzeko.</div>
+        </div>
+      </div>
+
+      <aside class="explain">
+        <div class="result" id="resultBox">
+          <div class="kicker">Prediction</div>
+          <div class="prediction" id="prediction">Klase 1</div>
+          <div class="location" id="location">Marjinaren barruan, alde positiboan</div>
+          <div class="why" id="why">Score positiboa denez, SVM-k Klase 1 aurresaten du.</div>
+        </div>
+
+        <div class="rule">
+          <h3>Gako nagusia</h3>
+          <p><strong>Marjinak entrenamenduan dira garrantzitsuak.</strong> Prediction egitean, puntu berriaren <strong>decision score-aren zeinua</strong> erabiltzen da.</p>
+        </div>
+
+        <div class="cases">
+          <div class="case">
+            <code>score &gt; 0</code>
+            <span>decision boundary-ren alde positiboa → Klase 1</span>
+          </div>
+          <div class="case">
+            <code>score &lt; 0</code>
+            <span>decision boundary-ren alde negatiboa → Klase 0</span>
+          </div>
+          <div class="case">
+            <code>|score| &lt; 1</code>
+            <span>puntua marjinaren barruan dago, baina klasea 0 edo 1 da berdin-berdin</span>
+          </div>
+          <div class="case">
+            <code>score = 0</code>
+            <span>matematikoki decision boundary-ren gainean dago</span>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="footer">
+      <div class="footer-card">
+        <strong>Ez da probabilitatea</strong>
+        `decision_function()`-en 0.30 balioak ez du %30 esan nahi.
+      </div>
+      <div class="footer-card">
+        <strong>Marjinaren barruan ere prediction dago</strong>
+        +0.20 → Klase 1; −0.20 → Klase 0.
+      </div>
+      <div class="footer-card">
+        <strong>Zenbat eta |score| handiagoa…</strong>
+        puntu berria mugatik urrunago dago (SVM linealean, distantziarekin proportzionala).
+      </div>
+    </footer>
+  </main>
+
+<script>
+(() => {
+  const slider = document.getElementById('slider');
+  const point = document.getElementById('point');
+  const badge = document.getElementById('badge');
+  const scoreOutput = document.getElementById('scoreOutput');
+  const prediction = document.getElementById('prediction');
+  const location = document.getElementById('location');
+  const why = document.getElementById('why');
+  const resultBox = document.getElementById('resultBox');
+
+  function fmt(v){
+    if (Math.abs(v) < 0.005) return "0.00";
+    return (v > 0 ? "+" : "") + v.toFixed(2);
+  }
+
+  function pos(v){
+    return 6 + ((v + 2) / 4) * 88; // map -2..2 to 6%..94%
+  }
+
+  function update(){
+    let v = Number(slider.value);
+    if (!Number.isFinite(v)) v = 0;
+    v = Math.max(-2, Math.min(2, v));
+
+    const left = pos(v) + "%";
+    point.style.left = left;
+    badge.style.left = left;
+
+    badge.textContent = "score = " + fmt(v);
+    scoreOutput.textContent = fmt(v);
+
+    const eps = 0.005;
+
+    if (Math.abs(v) < eps){
+      point.style.background = "#111827";
+      prediction.textContent = "Mugan";
+      location.textContent = "Decision boundary-ren gainean";
+      why.textContent = "Geometrikoki berdinketa da: score = 0. Praktikan, balio zehatz hori oso arraroa da.";
+      resultBox.style.background = "#f3f4f6";
+      resultBox.style.borderColor = "#9ca3af";
+    }
+    else if (v > 0){
+      point.style.background = "#1976d2";
+      prediction.textContent = "Klase 1";
+      location.textContent = v < 1
+        ? "Marjinaren barruan, alde positiboan"
+        : "Marjinatik kanpo, alde positiboan";
+      why.textContent = "Score positiboa denez, SVM-k Klase 1 aurresaten du.";
+      resultBox.style.background = "#eaf4ff";
+      resultBox.style.borderColor = "#90caf9";
+    }
+    else{
+      point.style.background = "#e53935";
+      prediction.textContent = "Klase 0";
+      location.textContent = v > -1
+        ? "Marjinaren barruan, alde negatiboan"
+        : "Marjinatik kanpo, alde negatiboan";
+      why.textContent = "Score negatiboa denez, SVM-k Klase 0 aurresaten du.";
+      resultBox.style.background = "#fff0f0";
+      resultBox.style.borderColor = "#ef9a9a";
+    }
+  }
+
+  slider.addEventListener('input', update);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const step = e.shiftKey ? 0.1 : 0.05;
+    const dir = e.key === "ArrowRight" ? 1 : -1;
+    let v = Number(slider.value) + dir * step;
+    v = Math.max(-2, Math.min(2, v));
+    slider.value = v.toFixed(2);
+    update();
+  });
+
+  update();
+})();
+</script>
+</body>
+</html>
